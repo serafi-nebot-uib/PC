@@ -1,5 +1,3 @@
-package pkg237_threads;
-
 public class Threads implements Runnable {
     static final int THREADS = 2;
     int id;

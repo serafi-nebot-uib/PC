@@ -1,0 +1,5 @@
+build/
+*.o
+*.ali
+*.class
+.DS_Store

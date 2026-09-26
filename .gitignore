@@ -1,0 +1,7 @@
+.DS_Store
+.localized
+
+__pycache__
+build
+*.o
+*.class
