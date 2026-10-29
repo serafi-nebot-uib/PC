@@ -57,7 +57,7 @@ The asymmetry between NSC and CS is deliberate:
   eventually finish (we analyze the algorithms *given* the CS code terminates).
 * **The non-critical section need not progress** — a process whose control
   pointer is in the NSC may loop forever or stop; the algorithm must not rely
-> on NSC terminating. (A process stuck in the NSC is not even "competing".)
+  on NSC terminating. (A process stuck in the NSC is not even "competing".)
 
 ### The three required properties
 
@@ -94,7 +94,7 @@ imposes four structural constraints on any acceptable solution:
    critical section — as long as it stopped outside the CS.
 4. **Finite decision.** If several processes want to enter simultaneously,
    the decision of who enters is taken after a finite number of steps (no
->  unbounded negotiation).
+   unbounded negotiation).
 
 > **About `await`.** From here on, `await B` is an atomic statement that
 > waits until condition `B` holds. In real code it is implemented as a
@@ -233,7 +233,7 @@ od                              od
 
   (Machine-checked: the state `(p2, q2, wantp=wantq=true)` is reachable and
   has no outgoing transition — a true deadlock, both processes blocked
-> forever.)
+  forever.)
 
 Progress fails with a vengeance: the fix for one pathology introduced a
 worse one. Each process *insists* on its right to enter (flag up, waiting)

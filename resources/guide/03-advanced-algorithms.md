@@ -364,8 +364,8 @@ Three culprits, in increasing order of difficulty:
    core, even ones not involved.
 3. **Out-of-order (dynamic) execution.** To avoid waiting for memory, the
    processor itself reorders loads and stores whenever no *single-thread*
->  semantics depend on the order — i.e., always, for accesses to *different*
->  variables, which is exactly our flags and turn variables.
+   semantics depend on the order — i.e., always, for accesses to *different*
+   variables, which is exactly our flags and turn variables.
 
 ### 3.4.3 The killer example: Dekker/Peterson on real hardware
 

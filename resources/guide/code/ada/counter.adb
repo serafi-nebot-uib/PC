@@ -22,7 +22,11 @@ procedure Counter is
 
    W : array (1 .. THREADS) of Worker;
 begin
-   null;
+   declare
+      W : array (1 .. THREADS) of Worker;
+   begin
+      null;
+   end;   -- the workers finish here
    Put_Line ("n =" & Integer'Image (N)
              & " (expected" & Integer'Image (ITERS * THREADS) & ")");
 end Counter;

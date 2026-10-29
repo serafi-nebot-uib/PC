@@ -22,10 +22,11 @@ common confusion is.
 | 2 | [02-critical-section.md](02-critical-section.md) | The critical section problem: requirements, four failed attempts, Dekker's algorithm, Peterson's algorithm | `02_RegioCritica.pdf` |
 | 3 | [03-advanced-algorithms.md](03-advanced-algorithms.md) | Lamport's bakery algorithm, Lamport's fast mutual exclusion, sequential consistency and memory barriers | `03_AlgorismesAvançats.pdf` |
 | 4 | [04-hardware-synchronization.md](04-hardware-synchronization.md) | Hardware synchronization: atomic read-modify-write instructions, spinlocks, ticket locks, compare-and-swap | `04_SolucionsPerHardware.pdf` |
+| 5 | [05-semaphores.md](05-semaphores.md) | Semaphores: wait/signal, binary & counting, Bartz's simulation, barriers, producer–consumer (split semaphores), dining philosophers (LR, Tanenbaum), the bear and the honey pot | `05_Semafors.pdf` |
+| 6 | [06-monitors.md](06-monitors.md) | Monitors: Java synchronized, condition variables (explicit / Java / Ada protected objects), priority schemes (Hoare/Mesa/Java, IRR), semaphore simulation, producer–consumer, readers–writers, philosophers, the honey pot | `06_Monitors.pdf` |
 
-More chapters will be added as new slide sets arrive (expected, per the course
-syllabus: semaphores, monitors, channels/messages, producer–consumer,
-readers–writers, consensus).
+More chapters will be added as new slide sets arrive (expected, per the
+course syllabus: channels/messages, consensus).
 
 Each chapter ends with: a **summary**, **exercises with solutions**, and a
 **going further** section with literature and advanced topics.

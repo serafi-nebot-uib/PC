@@ -288,8 +288,13 @@ end Demo;
 
 * A task is **activated** at the `begin` of the enclosing unit: it starts
   running in parallel with the parent and its sibling tasks.
-* The enclosing subprogram **does not finish until all tasks it declared have
-  finished** — an implicit join at the end of the block.
+* The enclosing subprogram **does not finish until all tasks it declared
+  have finished** — an implicit join at the end of the block. Careful: that
+  wait happens *at the end* — statements in the block's body run *while the
+  tasks are still active*. To wait for tasks and then continue, declare
+  them in an inner `declare … begin … end;` block (see the mains of
+  [`code/ada/counter.adb`](code/ada/counter.adb) and
+  [`code/ada/readerswriters.adb`](code/ada/readerswriters.adb)).
 * For shared variables, Ada lets you declare them `pragma Volatile` /
   `pragma Atomic` (and `Volatile_Components` / `Atomic_Components` to make all
   elements of an array volatile/atomic) — the same concerns as Java's

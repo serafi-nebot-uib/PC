@@ -18,12 +18,12 @@ The pure-software mutual exclusion algorithms suffer from three problems:
   memory, generating a flood of cache-coherence traffic that slows every
   core in the machine — even the one making progress.
 * **Unpredictable interleaving.** Their correctness arguments are delicate
->  orderings of ordinary reads and writes — and as chapter 3 showed, real
->  compilers and processors do not honor the sequential consistency these
->  proofs assume. Making them work on real hardware requires barriers or
->  atomics anyway.
+   orderings of ordinary reads and writes — and as chapter 3 showed, real
+   compilers and processors do not honor the sequential consistency these
+   proofs assume. Making them work on real hardware requires barriers or
+   atomics anyway.
 * **Busy waiting.** All of them wait by spinning (`await` = `while not B do
-> skip`), burning CPU.
+  skip`), burning CPU.
 
 The classic "obvious" fix — **disable interrupts** around the critical
 section, so the scheduler cannot preempt — is a non-starter:
@@ -222,7 +222,7 @@ conditional on nothing having changed in between.
   of exit (the ticket lock needs two plus an await).
 * You can define **as many independent critical sections as you like**,
   each with its own variable (fine-grained locking), instead of one global
->  algorithm instance.
+  algorithm instance.
 
 **Weaknesses:**
 
