@@ -11,7 +11,6 @@ class Gender(Enum):
   MALE = auto()
   FEMALE = auto()
 
-
 RESTROOM_CNT_MAX = 3
 RESTROOM_TIMES = 2
 
@@ -39,13 +38,14 @@ def enter(name: str, t: int, gender: Gender):
   choosing.release()
   debug(f"{name} ticket: {ticket}")
 
-  nxt = False
-  while not nxt:
+  can_enter = False
+  while not can_enter:
     restroom.acquire()
-    nxt = inside_last == ticket - 1
+    can_enter = inside_last == ticket - 1
     restroom.release()
-    if not nxt:
+    if not can_enter:
       debug(f"{name} next wait")
+      not_full.release()
       not_full.acquire()
 
   while True:
@@ -130,23 +130,6 @@ def exit(name: str, gender: Gender):
 #     restroom_type = None
 #     restroom_empty.release() # signal to waiting processes that the restroom is empty
 #   lock.release()
-
-class Queue:
-  def __init__(self):
-    self.gate = Semaphore(0)
-    self.lock = Semaphore(1)
-    self.waiting = 0
-
-  def wait(self):
-    self.lock.acquire()
-    self.waiting += 1
-    self.lock.release()
-
-    self.gate.acquire()
-
-    self.lock.acquire()
-    self.waiting -= 1
-    self.lock.release()
 
 def worker(name: str, gender: Gender):
   prefix = " " * int(gender == Gender.FEMALE) * 8
