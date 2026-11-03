@@ -1,0 +1,461 @@
+================================================================================
+ PR1 - PROBLEMA DEL BANY MIXT AMB SEMAFORS
+ 21720 Programacio Concurrent - Curs 2026-2027
+================================================================================
+
+IDEA I FUNCIONAMENT
+-------------------
+El bany queda assignat a un sexe mentre un grup el fa servir.
+
+Exemple de referència (H = Home, D = Done, subíndexos indiquen ordre d'arribada):
+
+H7 D6 H5 H4 -> [H3 H2 H1]
+
+H1, H2, H3, H4, H5 formen un grup: poden passar un darrera l'altre sense haver
+de cedir el pas a ningú (l'ordre d'arribada es manté perque s'utilitzen semàfors
+amb coa FIFO estricte (fairness = true). D6 ha d'esperar a que el grup que hi ha
+davant acabi (bany buit). El mateix per a H7.
+Es separa per grups de sexe per tal d'evitar adelantaments entre sexes (D6 no pot
+passar davant H5 o H4).
+
+Semafors, tots amb cues FIFO (fairness = true):
+  torn   (binari)     : nomes un fil decideix si entrar o esperar
+  bany   (binari)     : dret d'us del bany; l'agafa el primer del grup i el
+                        deixa darrer del grup en sortir
+  places (comptador 3): capacitat maxima del bany
+  mtx    (binari)     : protegeix tipus (sexe que te el bany, null = lliure),
+                        nGrup (membres del grup: dins o esperant plaça) i
+                        nDins (persones dins)
+
+Protocol entrada: el fil agafa el torn. Si tipus == sexe s'afegeix al grup (nGrup++),
+si no, es el primer del grup següent i fa bany.acquire() sense alliberar el
+torn: si l'altre sexe hi es, espera retinguent el torn. Despres deixa el torn,
+espera per a una plaça, incrementa nDins i entra.
+
+Protocol sortida: si es el darrer del grup (nGrup == 0) allibera el bany per a l'altre
+sexe.
+
+JUSTIFICACIO DE LES PROPIETATS
+------------------------------
+
+EXCLUSIÓ MÚTUA
+Per estar a dins des bany, un fil ha de passar la decisió "tipus == sexe" i
+tenir una de les 3 plaçes.
+
+Mentre hi ha algú al bany el tipus no canvia, per tant un fil que arriba i
+"tipus != sexe" es bloqueja.
+
+El semàfor "bany" està retingut pel grup mentre esta dintre del bany
+(l'agafa el primer en entrar, l'allibera el darrer en sortir).
+
+Mai hi ha més de 3 persones al bany, el semàfor places (comptador 3) ho assegura.
+
+
+ABSENCIA D'INTERBLOQUEIG
+L'únic semàfor que pot provocar blogeigos és el torn (bany.acquire() entre
+torn.acquire() i torn.release()), però no es blogeiga mai perque el grup que
+esta actualment dins del bany reté el semàfor bany i no necessita el semàfor
+torn per avançar. Per tant, no hi ha interblogeigos.
+
+El semàfor mtx mai es reté mentre s'espera un altre semàfor.
+
+
+ABSENCIA D'INANICIO
+El primer del pròxim grup espera el bany sense alliberar el torn, per tant,
+cap fil nou de cap sexe pot adelantar-lo.
+
+El darrer en sortir (del grup que té el bany) allibera el bany i el primer
+del pròxim grup pot entrar (fairness = true -> es manté l'ordre d'arribada).
+
+Per tant, els grups (diferents sexes) s'alternen i l'espera màxima es la durada
+del grup contrai que hi ha actualment (3 dins + els del seu grup que esta pendent
+per entrar).
+
+
+ESPERA LIMITADA
+Els semàfors són cues FIFO perque es creen amb "fairness = true". Per tant,
+tots els fils poden adquirir un semàfor només si els que han arribat davant
+seu han acabat.
+
+De totes formes, adelantaments entre sexes es manté inclús fora "fairness = true"
+perque es reté el semàfor torn i es comprova que "tipus == sexe" abans d'entrar.
+
+
+
+
+
+
+--------------------------------------------------------------------------------
+ EXECUCIO 1
+--------------------------------------------------------------------------------
+
+BERNAT arriba al despatx
+        AINA arriba al despatx
+ANTONI arriba al despatx
+GORI arriba al despatx
+        CATALINA arriba al despatx
+ANTONI treballa
+        GERONIA arriba al despatx
+GORI treballa
+JAUME arriba al despatx
+        JOANA arriba al despatx
+        FRANCESCA arriba al despatx
+BERNAT treballa
+DAMIA arriba al despatx
+GORI entra 1/2. Homes al bany: 1
+        ELISABET arriba al despatx
+        AINA treballa
+COSME arriba al despatx
+        CATALINA treballa
+        FRANCESCA treballa
+COSME treballa
+        JOANA treballa
+DAMIA treballa
+JAUME treballa
+        GERONIA treballa
+GORI surt
+*** El bany està buit***
+        AINA entra 1/2. Dones al bany: 1
+        FRANCESCA entra 1/2. Dones al bany: 2
+        ELISABET treballa
+GORI treballa
+        FRANCESCA surt
+        AINA surt
+*** El bany està buit***
+ANTONI entra 1/2. Homes al bany: 1
+DAMIA entra 1/2. Homes al bany: 2
+        AINA treballa
+DAMIA surt
+        FRANCESCA treballa
+DAMIA treballa
+ANTONI surt
+*** El bany està buit***
+        CATALINA entra 1/2. Dones al bany: 1
+ANTONI treballa
+        CATALINA surt
+*** El bany està buit***
+JAUME entra 1/2. Homes al bany: 1
+BERNAT entra 1/2. Homes al bany: 2
+COSME entra 1/2. Homes al bany: 3
+        CATALINA treballa
+BERNAT surt
+COSME surt
+BERNAT treballa
+COSME treballa
+JAUME surt
+*** El bany està buit***
+        ELISABET entra 1/2. Dones al bany: 1
+        JOANA entra 1/2. Dones al bany: 2
+        GERONIA entra 1/2. Dones al bany: 3
+        ELISABET surt
+JAUME treballa
+        JOANA surt
+        ELISABET treballa
+        GERONIA surt
+*** El bany està buit***
+GORI entra 2/2. Homes al bany: 1
+        JOANA treballa
+GORI surt
+*** El bany està buit***
+        AINA entra 2/2. Dones al bany: 1
+        FRANCESCA entra 2/2. Dones al bany: 2
+        AINA surt
+        GERONIA treballa
+        FRANCESCA surt
+*** El bany està buit***
+DAMIA entra 2/2. Homes al bany: 1
+GORI acaba la feina
+DAMIA surt
+*** El bany està buit***
+        CATALINA entra 2/2. Dones al bany: 1
+        FRANCESCA acaba la feina
+        AINA acaba la feina
+DAMIA acaba la feina
+        CATALINA surt
+*** El bany està buit***
+ANTONI entra 2/2. Homes al bany: 1
+BERNAT entra 2/2. Homes al bany: 2
+COSME entra 2/2. Homes al bany: 3
+        CATALINA acaba la feina
+ANTONI surt
+COSME surt
+COSME acaba la feina
+ANTONI acaba la feina
+BERNAT surt
+*** El bany està buit***
+        ELISABET entra 2/2. Dones al bany: 1
+BERNAT acaba la feina
+        ELISABET surt
+*** El bany està buit***
+JAUME entra 2/2. Homes al bany: 1
+        ELISABET acaba la feina
+JAUME surt
+*** El bany està buit***
+        JOANA entra 2/2. Dones al bany: 1
+        GERONIA entra 2/2. Dones al bany: 2
+        JOANA surt
+JAUME acaba la feina
+        GERONIA surt
+*** El bany està buit***
+        JOANA acaba la feina
+        GERONIA acaba la feina
+
+COMENTARI: alternanca estricta durant tota l'execucio (H D H D H D H D H D H D
+H D); l'ultim de cada grup imprimeix "*** El bany esta buit***" i l'altre sexe
+entra immediatament; els 12 fils acaben.
+
+
+--------------------------------------------------------------------------------
+ EXECUCIO 2
+--------------------------------------------------------------------------------
+
+ANTONI arriba al despatx
+COSME arriba al despatx
+BERNAT arriba al despatx
+        AINA arriba al despatx
+DAMIA arriba al despatx
+        CATALINA arriba al despatx
+        AINA treballa
+DAMIA treballa
+        CATALINA treballa
+        ELISABET arriba al despatx
+GORI arriba al despatx
+        JOANA arriba al despatx
+JAUME arriba al despatx
+JAUME treballa
+        AINA entra 1/2. Dones al bany: 1
+        JOANA treballa
+        FRANCESCA arriba al despatx
+BERNAT treballa
+        FRANCESCA treballa
+        GERONIA arriba al despatx
+ANTONI treballa
+        JOANA entra 1/2. Dones al bany: 2
+COSME treballa
+GORI treballa
+        ELISABET treballa
+        AINA surt
+        JOANA surt
+*** El bany està buit***
+DAMIA entra 1/2. Homes al bany: 1
+DAMIA surt
+*** El bany està buit***
+        FRANCESCA entra 1/2. Dones al bany: 1
+DAMIA treballa
+        GERONIA treballa
+        AINA treballa
+        FRANCESCA surt
+*** El bany està buit***
+ANTONI entra 1/2. Homes al bany: 1
+        JOANA treballa
+ANTONI surt
+*** El bany està buit***
+        CATALINA entra 1/2. Dones al bany: 1
+        FRANCESCA treballa
+ANTONI treballa
+        CATALINA surt
+*** El bany està buit***
+BERNAT entra 1/2. Homes al bany: 1
+COSME entra 1/2. Homes al bany: 2
+JAUME entra 1/2. Homes al bany: 3
+        CATALINA treballa
+BERNAT surt
+GORI entra 1/2. Homes al bany: 3
+COSME surt
+COSME treballa
+JAUME surt
+BERNAT treballa
+GORI surt
+*** El bany està buit***
+        GERONIA entra 1/2. Dones al bany: 1
+        ELISABET entra 1/2. Dones al bany: 2
+JAUME treballa
+        ELISABET surt
+GORI treballa
+        GERONIA surt
+*** El bany està buit***
+DAMIA entra 2/2. Homes al bany: 1
+        ELISABET treballa
+DAMIA surt
+*** El bany està buit***
+        AINA entra 2/2. Dones al bany: 1
+        JOANA entra 2/2. Dones al bany: 2
+        FRANCESCA entra 2/2. Dones al bany: 3
+        GERONIA treballa
+        AINA surt
+        CATALINA entra 2/2. Dones al bany: 3
+DAMIA acaba la feina
+        JOANA surt
+        CATALINA surt
+        FRANCESCA surt
+*** El bany està buit***
+ANTONI entra 2/2. Homes al bany: 1
+COSME entra 2/2. Homes al bany: 2
+GORI entra 2/2. Homes al bany: 3
+        CATALINA acaba la feina
+        JOANA acaba la feina
+        FRANCESCA acaba la feina
+COSME surt
+BERNAT entra 2/2. Homes al bany: 3
+GORI surt
+JAUME entra 2/2. Homes al bany: 3
+ANTONI surt
+        AINA acaba la feina
+COSME acaba la feina
+GORI acaba la feina
+ANTONI acaba la feina
+BERNAT surt
+JAUME surt
+*** El bany està buit***
+        ELISABET entra 2/2. Dones al bany: 1
+        GERONIA entra 2/2. Dones al bany: 2
+        ELISABET surt
+BERNAT acaba la feina
+        ELISABET acaba la feina
+        GERONIA surt
+*** El bany està buit***
+JAUME acaba la feina
+        GERONIA acaba la feina
+
+COMENTARI: fragment clau de la primera ona d'homes (4 membres):
+
+    BERNAT entra 1/2. Homes al bany: 1
+    COSME entra 1/2. Homes al bany: 2
+    JAUME entra 1/2. Homes al bany: 3      (bany ple)
+    BERNAT surt
+    GORI entra 1/2. Homes al bany: 3       <- el 4rt: esperava placa al semafor
+    COSME surt                                "places" i hi entra quan BERNAT
+    JAUME surt                                la deixa lliure; comptador mai > 3
+    GORI surt
+
+A la segona ona d'homes (5 membres) hi ha dues reposicions (BERNAT i JAUME
+entren substituint COSME i GORI). A l'ona de dones, CATALINA entra quan AINA
+surt ("Dones al bany: 3"). Alternanca estricta de sexes en tota l'execucio.
+
+
+--------------------------------------------------------------------------------
+ EXECUCIO 3
+--------------------------------------------------------------------------------
+
+        FRANCESCA arriba al despatx
+GORI arriba al despatx
+        AINA arriba al despatx
+ANTONI arriba al despatx
+        JOANA arriba al despatx
+        ELISABET arriba al despatx
+ANTONI treballa
+COSME arriba al despatx
+GORI treballa
+BERNAT arriba al despatx
+JAUME arriba al despatx
+DAMIA arriba al despatx
+COSME treballa
+        GERONIA arriba al despatx
+COSME entra 1/2. Homes al bany: 1
+        CATALINA arriba al despatx
+        JOANA treballa
+        AINA treballa
+        FRANCESCA treballa
+        GERONIA treballa
+BERNAT treballa
+        ELISABET treballa
+        CATALINA treballa
+DAMIA treballa
+JAUME treballa
+COSME surt
+*** El bany està buit***
+        AINA entra 1/2. Dones al bany: 1
+        JOANA entra 1/2. Dones al bany: 2
+        JOANA surt
+        JOANA treballa
+        AINA surt
+*** El bany està buit***
+ANTONI entra 1/2. Homes al bany: 1
+        AINA treballa
+ANTONI surt
+*** El bany està buit***
+        FRANCESCA entra 1/2. Dones al bany: 1
+        ELISABET entra 1/2. Dones al bany: 2
+        GERONIA entra 1/2. Dones al bany: 3
+COSME treballa
+        GERONIA surt
+        FRANCESCA surt
+ANTONI treballa
+        GERONIA treballa
+        ELISABET surt
+*** El bany està buit***
+GORI entra 1/2. Homes al bany: 1
+JAUME entra 1/2. Homes al bany: 2
+DAMIA entra 1/2. Homes al bany: 3
+        ELISABET treballa
+DAMIA surt
+BERNAT entra 1/2. Homes al bany: 3
+DAMIA treballa
+GORI surt
+        FRANCESCA treballa
+BERNAT surt
+JAUME surt
+*** El bany està buit***
+        CATALINA entra 1/2. Dones al bany: 1
+        AINA entra 2/2. Dones al bany: 2
+        JOANA entra 2/2. Dones al bany: 3
+GORI treballa
+        JOANA surt
+        GERONIA entra 2/2. Dones al bany: 3
+        AINA surt
+BERNAT treballa
+        GERONIA surt
+JAUME treballa
+        CATALINA surt
+*** El bany està buit***
+COSME entra 2/2. Homes al bany: 1
+ANTONI entra 2/2. Homes al bany: 2
+DAMIA entra 2/2. Homes al bany: 3
+        JOANA acaba la feina
+        AINA acaba la feina
+        GERONIA acaba la feina
+        CATALINA treballa
+ANTONI surt
+DAMIA surt
+COSME surt
+*** El bany està buit***
+        ELISABET entra 2/2. Dones al bany: 1
+ANTONI acaba la feina
+DAMIA acaba la feina
+COSME acaba la feina
+        ELISABET surt
+*** El bany està buit***
+GORI entra 2/2. Homes al bany: 1
+        ELISABET acaba la feina
+GORI surt
+*** El bany està buit***
+        FRANCESCA entra 2/2. Dones al bany: 1
+GORI acaba la feina
+        FRANCESCA surt
+*** El bany està buit***
+BERNAT entra 2/2. Homes al bany: 1
+JAUME entra 2/2. Homes al bany: 2
+JAUME surt
+BERNAT surt
+*** El bany està buit***
+        CATALINA entra 2/2. Dones al bany: 1
+        CATALINA surt
+*** El bany està buit***
+        FRANCESCA acaba la feina
+JAUME acaba la feina
+BERNAT acaba la feina
+        CATALINA acaba la feina
+
+COMENTARI: fragment clau (figura 3 de l'enunciat, literalment):
+
+    GORI entra 1/2. Homes al bany: 1
+    JAUME entra 1/2. Homes al bany: 2
+    DAMIA entra 1/2. Homes al bany: 3      (bany ple)
+    DAMIA surt
+    BERNAT entra 1/2. Homes al bany: 3     <- "el 4art H ha d'esperar que acabi
+                                              un H per poder ser el 3er a dins"
+    GORI surt -> BERNAT surt -> JAUME surt -> *** El bany esta buit***
+
+I a l'ona de dones: CATALINA(1), AINA(2), JOANA(3); JOANA surt -> GERONIA entra
+"Dones al bany: 3". Alternanca H -> D -> H -> ... en totes les ones; els 12
+fils acaben.

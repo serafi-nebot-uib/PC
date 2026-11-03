@@ -1,0 +1,81 @@
+================================================================================
+ PR1 - EL PROBLEMA DEL BANY MIXT AMB SEMAFORS
+ Idea i justificacio de les propietats
+================================================================================
+
+IDEA I FUNCIONAMENT
+-------------------
+El bany queda assignat a un sexe mentre un grup el fa servir.
+
+Exemple de referència (H = Home, D = Done, subíndexos indiquen ordre d'arribada):
+
+H7 D6 H5 H4 -> [H3 H2 H1]
+
+H1, H2, H3, H4, H5 formen un grup: poden passar un darrera l'altre sense haver
+de cedir el pas a ningú (l'ordre d'arribada es manté perque s'utilitzen semàfors
+amb coa FIFO estricte (fairness = true). D6 ha d'esperar a que el grup que hi ha
+davant acabi (bany buit). El mateix per a H7.
+Es separa per grups de sexe per tal d'evitar adelantaments entre sexes (D6 no pot
+passar davant H5 o H4).
+
+Semafors, tots amb cues FIFO (fairness = true):
+  torn   (binari)     : nomes un fil decideix si entrar o esperar
+  bany   (binari)     : dret d'us del bany; l'agafa el primer del grup i el
+                        deixa darrer del grup en sortir
+  places (comptador 3): capacitat maxima del bany
+  mtx    (binari)     : protegeix tipus (sexe que te el bany, null = lliure),
+                        nGrup (membres del grup: dins o esperant plaça) i
+                        nDins (persones dins)
+
+Protocol entrada: el fil agafa el torn. Si tipus == sexe s'afegeix al grup (nGrup++),
+si no, es el primer del grup següent i fa bany.acquire() sense alliberar el
+torn: si l'altre sexe hi es, espera retinguent el torn. Despres deixa el torn,
+espera per a una plaça, incrementa nDins i entra.
+
+Protocol sortida: si es el darrer del grup (nGrup == 0) allibera el bany per a l'altre
+sexe.
+
+JUSTIFICACIO DE LES PROPIETATS
+------------------------------
+
+EXCLUSIÓ MÚTUA
+Per estar a dins des bany, un fil ha de passar la decisió "tipus == sexe" i
+tenir una de les 3 plaçes.
+
+Mentre hi ha algú al bany el tipus no canvia, per tant un fil que arriba i
+"tipus != sexe" es bloqueja.
+
+El semàfor "bany" està retingut pel grup mentre esta dintre del bany
+(l'agafa el primer en entrar, l'allibera el darrer en sortir).
+
+Mai hi ha més de 3 persones al bany, el semàfor places (comptador 3) ho assegura.
+
+
+ABSENCIA D'INTERBLOQUEIG
+L'únic semàfor que pot provocar blogeigos és el torn (bany.acquire() entre
+torn.acquire() i torn.release()), però no es blogeiga mai perque el grup que
+esta actualment dins del bany reté el semàfor bany i no necessita el semàfor
+torn per avançar. Per tant, no hi ha interblogeigos.
+
+El semàfor mtx mai es reté mentre s'espera un altre semàfor.
+
+
+ABSENCIA D'INANICIO
+El primer del pròxim grup espera el bany sense alliberar el torn, per tant,
+cap fil nou de cap sexe pot adelantar-lo.
+
+El darrer en sortir (del grup que té el bany) allibera el bany i el primer
+del pròxim grup pot entrar (fairness = true -> es manté l'ordre d'arribada).
+
+Per tant, els grups (diferents sexes) s'alternen i l'espera màxima es la durada
+del grup contrai que hi ha actualment (3 dins + els del seu grup que esta pendent
+per entrar).
+
+
+ESPERA LIMITADA
+Els semàfors són cues FIFO perque es creen amb "fairness = true". Per tant,
+tots els fils poden adquirir un semàfor només si els que han arribat davant
+seu han acabat.
+
+De totes formes, adelantaments entre sexes es manté inclús fora "fairness = true"
+perque es reté el semàfor torn i es comprova que "tipus == sexe" abans d'entrar.
