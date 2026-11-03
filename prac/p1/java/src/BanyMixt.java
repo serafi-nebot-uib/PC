@@ -1,114 +1,68 @@
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * 21720 Programació Concurrent — Curs 2026-2027
- * Primer exercici avaluable: El problema del bany mixt amb semàfors.
- *
- * Regles del bany:
- *   - No hi pot haver al mateix temps dones i homes.
- *   - Com a màxim 3 dones o 3 homes al mateix temps.
- *   - Cada persona hi va dues vegades durant la jornada.
- *
- * Eines de sincronització: ÚNICAMENT semàfors (comptadors i binaris).
- * Tots els semàfors es creen amb fairness = true (cues FIFO), de manera que
- * l'ordre d'arribada es respecta (H5 no adelanta H4) i, sobretot, es
- * garanteix la propietat fonamental contra la inanició: si una dona espera,
- * cap home que hi arribi després (H7) no pot entrar abans que ella.
- *
- * Idea central (el "torn d'entrada"):
- *   El primer procés de cada grup que arriba mentre hi ha l'altre sexe dins
- *   es queda BLOQUEJAT al semàfor "buit" SENSE alliberar el torn. Així cap
- *   procés nou (ni del seu sexe ni de l'altre) pot demanar plaça fins que el
- *   bany queda buit i li toca. Això força l'alternança de grups i impedeix
- *   la inanició de manera ESTRUCTURAL, independentment de l'ordre de les
- *   cues dels semàfors.
- */
 public class BanyMixt {
+    static final int BANY_MAX = 3; // capacitat màxima de persones al bany
+    static final int BANY_TIMES = 2; // vegades que cada persona va al bany durant una jornada
 
-    // ----------------------------- Configuració -----------------------------
-
-    /** Capacitat màxima del bany (per sexe). */
-    static final int MAX_BANY = 3;
-    /** Vegades que cada persona va al bany durant la jornada. */
-    static final int BANYADES = 2;
-
-    // ------------------------------- Semàfors -------------------------------
-    // Tots amb fairness = true: cues FIFO.
-
-    /** Torn d'entrada: només UN procés pot estar decidint si entrar o esperar. */
+    // torn de decisió: només una persona pot estar decidint si entrar o no a la vegada
     static final Semaphore torn = new Semaphore(1, true);
-    /** El bany està lliure. L'agafa el primer procés de cada grup i el deixa
-     *  l'últim procés del mateix grup en sortir. */
-    static final Semaphore buit = new Semaphore(1, true);
-    /** Multiplex dels homes: màxim MAX_BANY dins alhora. */
-    static final Semaphore hMult = new Semaphore(MAX_BANY, true);
-    /** Multiplex de les dones: màxim MAX_BANY dins alhora. */
-    static final Semaphore dMult = new Semaphore(MAX_BANY, true);
-    /** Protegeix els comptadors dels homes. */
-    static final Semaphore hMtx = new Semaphore(1, true);
-    /** Protegeix els comptadors de les dones. */
-    static final Semaphore dMtx = new Semaphore(1, true);
 
-    // ------------------------------ Comptadors ------------------------------
+    // dret d'us del bany: el reté el grup que pot passar al bany mentre el fa servir.
+    // l'agafa el primer que entra i l'allibera el darrer que surt
+    static final Semaphore bany = new Semaphore(1, true);
 
-    /** Homes que han reservat plaça (dins del bany o a punt d'hi entrar). */
-    static int hPend = 0;
-    /** Dones que han reservat plaça (dins del bany o a punt d'hi entrar). */
-    static int dPend = 0;
-    /** Homes dins del bany ara mateix. */
-    static int hDins = 0;
-    /** Dones dins del bany ara mateix. */
-    static int dDins = 0;
+    // places del bany (BANY_MAX): cuantes persones a dintre del bany hi pot haver
+    static final Semaphore places = new Semaphore(BANY_MAX, true);
 
-    /** Multiplicador de les esperes en ms (per defecte 1000; 0 = sense esperes,
-     *  útil per a proves d'estrès d'entrellaçats). */
-    static volatile long esperaMaxMs = 1000;
-
-    // ------------------------------ Processos -------------------------------
+    // mutex que protegeix les variables globals
+    static final Semaphore mtx = new Semaphore(1, true);
 
     enum Sexe { HOME, DONA }
+
+    static Sexe tipus = null; // sexe actual del bany (null = bany buit)
+    static int nGrup = 0; // comptador dels membres del grup que pot entrar (no ha d'esperar a que l'altre sexe acabi)
+    static int nDins = 0; // comptador de persones dintre del bany
+
+    static final long ESPERA_MAX_MS = 1000; // espera màxima en ms entre fases
 
     static final class Persona extends Thread {
 
         private final Sexe sexe;
-        /** Les dones escriuen els missatges sagnats amb 8 espais, com a la
-         *  sortida d'exemple de l'enunciat. */
         private final String prefix;
 
         Persona(String nom, Sexe sexe) {
-            super(nom);                    // l'identificador és una cadena
+            super(nom);
             this.sexe = sexe;
             this.prefix = (sexe == Sexe.DONA) ? "        " : "";
         }
 
         private void espera() throws InterruptedException {
-            long ms = (esperaMaxMs <= 0) ? 0
-                    : ThreadLocalRandom.current().nextLong(esperaMaxMs + 1);
+            long ms = (ESPERA_MAX_MS <= 0) ? 0 : ThreadLocalRandom.current().nextLong(ESPERA_MAX_MS + 1);
             if (ms > 0) Thread.sleep(ms);
         }
 
         private void missatge(String text) {
-            System.out.println(prefix + getName() + text);
+            System.out.println(prefix + getName() + " " + text);
         }
 
         @Override
         public void run() {
             try {
                 espera();
-                missatge(" arriba al despatx");
+                missatge("arriba al despatx");
 
-                for (int vegada = 1; vegada <= BANYADES; vegada++) {
+                for (int vegada = 1; vegada <= BANY_TIMES; vegada++) {
                     espera();
-                    missatge(" treballa");
+                    missatge("treballa");
                     espera();
                     entra(vegada);
-                    espera();               // temps dins del bany
+                    espera();
                     surt();
                 }
 
                 espera();
-                missatge(" acaba la feina");
+                missatge("acaba la feina");
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
             } catch (Throwable t) {
@@ -118,35 +72,40 @@ public class BanyMixt {
             }
         }
 
-        /**
-         * Reserva plaça, comprova que pot passar i entra al bany.
-         * A la sortida imprimeix "entra i/2. Homes|Dones al bany: N".
-         */
         private void entra(int vegada) throws InterruptedException {
-            boolean home = (sexe == Sexe.HOME);
-            Semaphore mult = home ? hMult : dMult;   // plaça del meu sexe
-            Semaphore mtx  = home ? hMtx  : dMtx;    // comptadors del meu sexe
-
-            mult.acquire();                  // 1) reservo una de les 3 places
-            torn.acquire();                  // 2) agafo el torn d'entrada
+            torn.acquire(); // agafar torn per a decidir si entrar o esperar (només un ho pot fer a la vegada)
 
             mtx.acquire();
-            int pend = home ? ++hPend : ++dPend;
-            boolean primer = (pend == 1);    // sóc el primer del meu grup?
+            boolean formarGrup = (tipus != sexe); // bany lliure o de l'altre sexe
+            if (formarGrup) {
+                // el bany esta lliure o actualment és de l'altre sexe
+                mtx.release();
+
+                // agafar el dret d'us del bany. possibles situacions:
+                // - bany lliure -> soc el primer del meu grup, agaf el bany en nom del meu grup i es reté fins que el darrer del grup surti
+                // - altre sexe encara hi és -> esper a que el grup (del sexe opost) l'alliberi
+                bany.acquire();
+
+                // el bany queda assignat al meu sexe
+                mtx.acquire();
+                tipus = sexe;
+                nGrup = 1;
+            } else {
+                // el bany ja esta assignat al meu sexe -> m'afagesc al grup
+                nGrup++;
+            }
             mtx.release();
+            torn.release(); // ja tenc lloc al grup garantit, deix passar al següent
 
-            // 3) Si sóc el primer del grup i hi ha l'altre sexe, espero el bany
-            //    buit MANTENINT el torn: cap procés nou pot demanar plaça fins
-            //    que jo hagi passat (H7 no adelanta mai D6).
-            if (primer) buit.acquire();
-            torn.release();
+            // esper una de les BANY_MAX plaçes que té el bany (bloqueig fins que algú del meu grup surti)
+            places.acquire();
 
-            // 4) Ja sóc dins: actualitzo el comptador i imprimeixo.
+            // dedins del bany -> actualitzar el comptador de persones que hi ha dintre
             mtx.acquire();
-            int dins = home ? ++hDins : ++dDins;
-            assert dins >= 1 && dins <= MAX_BANY : "capacitat del bany excedida";
-            missatge(" entra " + vegada + "/" + BANYADES + ". "
-                    + (home ? "Homes" : "Dones") + " al bany: " + dins);
+            int dins = ++nDins;
+            assert dins >= 1 && dins <= BANY_MAX : "capacitat del bany excedida";
+            assert tipus == sexe : "sexes barrejats dins del bany";
+            missatge("entra " + vegada + "/" + BANY_TIMES + ". " + (sexe == Sexe.HOME ? "Homes" : "Dones") + " al bany: " + dins);
             mtx.release();
         }
 
@@ -155,39 +114,25 @@ public class BanyMixt {
          * imprimeix que el bany ha quedat buit i el cedeix a l'altre sexe.
          */
         private void surt() throws InterruptedException {
-            boolean home = (sexe == Sexe.HOME);
-            Semaphore mult = home ? hMult : dMult;
-            Semaphore mtx  = home ? hMtx  : dMtx;
-
             mtx.acquire();
-            int dins = home ? --hDins : --dDins;
-            int pend = home ? --hPend : --dPend;
-            assert dins >= 0 && pend >= dins : "comptadors inconsistents";
-            missatge(" surt");
+            nDins--;
+            nGrup--;
+            boolean ultim = (nGrup == 0); // soc el darrer en surtir?
+            if (ultim) tipus = null; // soc el darrer -> canviar el sexe del bany a "no assignat"
+            assert nDins >= 0 && nGrup >= nDins : "comptadors inconsistents";
+            missatge("surt");
             mtx.release();
 
-            mult.release();                  // lliuro la meva plaça
+            places.release(); // sortir del bany i cedir la plaça al següent
 
-            if (pend == 0) {
-                // Últim del grup: el bany queda lliure per a l'altre sexe.
+            if (ultim) {
                 System.out.println("*** El bany està buit***");
-                buit.release();
+                bany.release(); // notificar al pròxim grup de que el bany ha quedat buit i poden avançar
             }
         }
     }
 
-    // --------------------------------- Main ---------------------------------
-
     public static void main(String[] args) throws InterruptedException {
-        if (args.length > 0) {
-            try {
-                esperaMaxMs = Long.parseLong(args[0]);
-            } catch (NumberFormatException e) {
-                System.err.println("Ús: java BanyMixt [esperaMàximaEnMs]  (0 = sense esperes)");
-                System.exit(2);
-            }
-        }
-
         Persona[] persones = {
             new Persona("GORI",      Sexe.HOME),
             new Persona("COSME",     Sexe.HOME),
@@ -204,6 +149,6 @@ public class BanyMixt {
         };
 
         for (Persona p : persones) p.start();
-        for (Persona p : persones) p.join();   // si algun thread es bloqueja, main no acaba
+        for (Persona p : persones) p.join();
     }
 }
